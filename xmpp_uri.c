@@ -26,6 +26,7 @@
 
 #define PLUGIN_ID           "xmpp-uri"
 #define PLUGIN_NAME         "XMPP URI Handler"
+#define PLUGIN_STATIC_NAME  "xmpp_uri"
 #define PLUGIN_VERSION      "0.1"
 #define PLUGIN_SUMMARY      "Handler for XMPP URI links (XEP-1047)."
 #define PLUGIN_DESCRIPTION  "This plugin adds support for XMPP URI links as "\
