@@ -19,12 +19,13 @@
 
 #include <glib.h>
 
+#include "debug.h"
 #include "gtkplugin.h"
 #include "notify.h"
 #include "plugin.h"
 #include "version.h"
 
-#define PLUGIN_ID           "xmpp-uri"
+#define PLUGIN_ID           "gtk-jravn-xmppuri"
 #define PLUGIN_NAME         "XMPP URI Handler"
 #define PLUGIN_STATIC_NAME  "xmpp_uri"
 #define PLUGIN_VERSION      "0.1"
@@ -40,9 +41,7 @@
 
 static gboolean
 plugin_load(PurplePlugin *plugin) {
-    purple_notify_message(plugin, PURPLE_NOTIFY_MSG_INFO, "Hello World!",
-            "This is the Hello World! plugin :)", NULL, NULL, NULL);
-
+    purple_debug_info(PLUGIN_ID, "Loaded\n");
     return TRUE;
 }
 

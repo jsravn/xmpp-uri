@@ -20,7 +20,7 @@
 #
 
 CC := gcc
-LIBTOOL := libtool
+CFLAGS := -O2 -Wall -g --std=gnu99
 
 ifeq ($(PREFIX),)
 	LIB_INSTALL_DIR = $(HOME)/.purple/plugins
