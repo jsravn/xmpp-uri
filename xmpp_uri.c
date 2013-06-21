@@ -25,6 +25,8 @@
 #include "conversation.h"
 #include "core.h"
 #include "debug.h"
+#include "eventloop.h"
+#include "gtkconv.h"
 #include "gtkplugin.h"
 #include "gtkimhtml.h"
 #include "plugin.h"
@@ -35,13 +37,13 @@
 #define PLUGIN_STATIC_NAME  "xmpp_uri"
 #define PLUGIN_VERSION      "0.2-dev"
 #define PLUGIN_SUMMARY      "Handler for inline XMPP URI links (XEP-0147)."
-#define PLUGIN_DESCRIPTION  "This plugin adds support for clicking on XMPP "\
-                            "URI links inside of conversation windows. "\
+#define PLUGIN_DESCRIPTION  "This plugin supports clicking of XMPP URI links. "\
                             "The URI scheme is defined by XEP-0147. "\
                             "Links take the form of "\
                             "'xmpp:user@domain.com?query;param=value'. The "\
                             "supported queries are:\n\n"\
-                            "  - ?message;body=hello%20world\n"
+                            "  - ?message;body=hello\%20buddy\n"\
+                            "  - ?join;body=hello\%20chat\n"
 #define PLUGIN_AUTHOR       "James Ravn <james.ravn@gmail.com>"
 #define PLUGIN_WEBSITE      "https://github.com/jsravn/xmpp-uri"
 
@@ -100,7 +102,8 @@ static GHashTable *find_params(const char *query) {
         const char *value = strtok_r(NULL, "=", &saveptr2);
 
         if (key && value) {
-            g_hash_table_insert(params, strdup(key), strdup(value));
+            g_hash_table_insert(params, g_uri_unescape_string(key, ""),
+                    g_uri_unescape_string(value, ""));
         }
         free(param_str);
 
@@ -126,6 +129,87 @@ static gboolean handle_message(PurpleAccount *acct, const char *jid,
     return TRUE;
 }
 
+
+typedef struct {
+    PurpleAccount *acct;
+    char *jid;
+    char *body;
+    guint tries;
+} FocusContext;
+
+static FocusContext *new_focus_context(PurpleAccount *acct, const char *jid,
+        const char *body) {
+    FocusContext *context = malloc(sizeof(FocusContext));
+    context->acct = acct;
+    context->jid = strdup(jid);
+    if (body) context->body = strdup(body);
+    context->tries = 0;
+    return context;
+}
+
+static void free_focus_context(FocusContext *context) {
+    free(context->jid);
+    if (context->body) free(context->body);
+    free(context);
+}
+
+static gboolean focus_chat(gpointer data) {
+    FocusContext *context = data;
+
+    PurpleConversation *conv = purple_find_conversation_with_account(
+            PURPLE_CONV_TYPE_CHAT, context->jid, context->acct);
+
+    if (!conv) {
+        if (context->tries++ > 50) {
+            purple_debug_misc(PLUGIN_ID, "Unable to focus %s [%s]\n",
+                    context->jid,
+                    purple_account_get_username(context->acct));
+            free_focus_context(context);
+            return FALSE;
+        } else {
+            return TRUE;
+        }
+    }
+
+    purple_debug_misc(PLUGIN_ID, "Found %s [%s], raising\n",
+            context->jid, purple_account_get_username(context->acct));
+
+    // XXX: Can't use purple_conversation_present because it's ignored
+    // when not in a user event state.
+    PidginConversation *gtkconv = PIDGIN_CONVERSATION(conv);
+    pidgin_conv_window_switch_gtkconv(gtkconv->win, gtkconv);
+
+    if (context->body) {
+        purple_conv_send_confirm(conv, context->body);
+    }
+
+    free_focus_context(context);
+    return FALSE;
+}
+
+static gboolean handle_join(PurpleAccount *acct, const char *jid,
+        GHashTable *params) {
+    PurpleConnection *con = purple_account_get_connection(acct);
+    PurplePlugin *prpl = purple_find_prpl(purple_account_get_protocol_id(acct));
+    PurplePluginProtocolInfo *prpl_info = PURPLE_PLUGIN_PROTOCOL_INFO(prpl);
+    if (!(prpl_info->chat_info_defaults && prpl_info->join_chat)) {
+        purple_debug_warning(PLUGIN_ID, "%s doesn't support chats\n",
+               purple_account_get_username(acct));
+        return FALSE;
+    }
+
+    GHashTable *chat_params = prpl_info->chat_info_defaults(con, jid);
+    prpl_info->join_chat(con, chat_params);
+
+    // XXX: Since the chat window is created in a callback we have to
+    // focus it later in the event loop.
+    const char *body = g_hash_table_lookup(params, "body");
+    FocusContext *context = new_focus_context(acct, jid, body);
+    purple_timeout_add(20, focus_chat, context);
+
+    return TRUE;
+}
+
 static void append_key_value(gpointer key, gpointer value, gpointer s) {
     g_string_append(s, "[");
     g_string_append(s, key);
@@ -142,8 +226,6 @@ static char *to_string(GHashTable *params) {
 
 static void log_action(PurpleAccount *acct, const char *jid,
         const char *action, GHashTable *params) {
-    if (!purple_debug_is_enabled) return;
-
     purple_debug_misc(PLUGIN_ID, "Account: %s\n",
             purple_account_get_username(acct));
     purple_debug_misc(PLUGIN_ID, "Jid: %s\n", jid);
@@ -159,6 +241,8 @@ static gboolean handle_action(PurpleAccount *acct, const char *jid,
 
     if (g_str_equal(action, "?message")) {
         return handle_message(acct, jid, params);
+    } else if (g_str_equal(action, "?join")) {
+        return handle_join(acct, jid, params);
     } else {
         purple_debug_warning(PLUGIN_ID, "Unrecognized action, doing nothing");
         return FALSE;
