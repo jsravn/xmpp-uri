@@ -1,0 +1,65 @@
+#
+# xmpp-uri Makefile.mingw - for windows cross compilation
+#
+# Copyright 2013 James Ravn
+#
+# Heavily inspired and copied from pidgin-latex's Makefile.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+
+HOST = i486-mingw32
+PIDGIN = ../pidgin-2.10.7
+GTK = ../win32-dev/gtk_2_0-2.14
+CC = $(HOST)-gcc
+CFLAGS = -O2 -Wall -g --std=gnu99
+
+INCLUDE_DIR = .
+GTK_TOP = $(GTK)
+PIDGIN_TOP = $(PIDGIN)
+PIDGIN_SRC = $(PIDGIN_TOP)/pidgin
+PURPLE_SRC = $(PIDGIN_TOP)/libpurple
+
+INCLUDE_PATHS = -I$(PURPLE_SRC) \
+	-I$(PURPLE_SRC)/win32 \
+	-I$(PIDGIN_SRC) \
+	-I$(PIDGIN_SRC)/win32 \
+	-I$(GTK_TOP)/include \
+	-I$(GTK_TOP)/include/gtk-2.0 \
+	-I$(GTK_TOP)/include/glib-2.0 \
+	-I$(GTK_TOP)/include/pango-1.0 \
+	-I$(GTK_TOP)/include/atk-1.0 \
+	-I$(GTK_TOP)/include/cairo \
+	-I$(GTK_TOP)/include/gdk-pixbuf-2.0 \
+	-I$(GTK_TOP)/lib/glib-2.0/include \
+	-I$(GTK_TOP)/lib/gtk-2.0/include
+
+LIB_PATHS = -L$(GTK_TOP)/lib \
+	-L$(PIDGIN_SRC) \
+	-L$(PURPLE_SRC)
+
+LIBS = -lpurple -lpidgin -lgtk-win32-2.0 -lintl -lglib-2.0
+
+.PHONY: all clean
+
+all: xmpp_uri.dll
+
+xmpp_uri.dll: xmpp_uri.o
+	$(CC) -shared $(CFLAGS) $< -o $@ $(LIBS) $(LIB_PATHS)
+
+xmpp_uri.o: xmpp_uri.c
+	$(CC) $(CFLAGS) $(INCLUDE_PATHS) -c $< -o $@ 
+
+clean:
+	rm -rf *.o *.dll

@@ -19,8 +19,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
 
-CC := gcc
-CFLAGS := -O2 -Wall -g --std=gnu99
+CC = gcc
+CFLAGS = -O2 -Wall -g --std=gnu99
 
 ifeq ($(PREFIX),)
 	LIB_INSTALL_DIR = $(HOME)/.purple/plugins
@@ -28,11 +28,10 @@ else
 	LIB_INSTALL_DIR = $(PREFIX)/lib/pidgin
 endif
 
-PIDGIN_CFLAGS = $(shell pkg-config pidgin --cflags)
-GTK_CFLAGS = $(shell pkg-config gtk+-2.0 --cflags)
-PIDGIN_LIBS = $(shell pkg-config pidgin --libs)
-GTK_LIBS = $(shell pkg-config gtk+-2.0 --libs)
-PIDGIN_LIBDIR = $(shell pkg-config --variable=libdir pidgin)/pidgin
+CFLAGS += $(shell pkg-config --cflags pidgin gtk+-2.0)
+LIBS := $(shell pkg-config --libs pidgin gtk+-2.0)
+
+.PHONY: all install clean
 
 all: xmpp_uri.so
 
@@ -41,10 +40,10 @@ install: all
 	cp xmpp_uri.so $(LIB_INSTALL_DIR)
 
 xmpp_uri.so: xmpp_uri.o
-	$(CC) -shared $(CFLAGS) $< -o $@ $(PIDGIN_LIBS) $(GTK_LIBS) -Wl,--export-dynamic -Wl,-soname
+	$(CC) -shared $(CFLAGS) $< -o $@ $(LIBS)
 
 xmpp_uri.o: xmpp_uri.c
-	$(CC) $(CFLAGS) -fPIC -c $< -o $@ $(PIDGIN_CFLAGS) $(GTK_CFLAGS) -DHAVE_CONFIG_H
+	$(CC) $(CFLAGS) -fPIC -c $< -o $@
 
 clean:
-	rm -rf *.o *.c~ *.h~ *.so *.la .libs
+	rm -rf *.o *.so

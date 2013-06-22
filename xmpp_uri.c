@@ -86,33 +86,30 @@ static PurpleAccount *find_acct(GtkIMHtml *imhtml) {
  * hash table should be destroyed by the calling function.
  */
 static GHashTable *find_params(const char *query) {
-    GHashTable *params = g_hash_table_new_full(g_str_hash, g_str_equal,
+    GHashTable *params_table = g_hash_table_new_full(g_str_hash, g_str_equal,
            g_free, g_free); 
 
     const char *start_of_params = strchr(query, ';');
-    if (!start_of_params) return params;
+    if (!start_of_params) return params_table;
 
-    char *params_str = strdup(start_of_params);
-    char *saveptr1, *saveptr2;
-    const char *start_of_param = strtok_r(params_str, ";", &saveptr1);
+    char **params = g_strsplit(start_of_params, ";", G_MAXINT);
 
-    while (start_of_param != NULL) {
-        char *param_str = strdup(start_of_param);
-        const char *key = strtok_r(param_str, "=", &saveptr2);
-        const char *value = strtok_r(NULL, "=", &saveptr2);
+    for (char **next = params; *next != NULL; next++) {
+        char **key_value = g_strsplit(*next, "=", 2);
+        const char *key = key_value[0];
+        const char *value = (key ? key_value[1] : NULL);
 
         if (key && value) {
-            g_hash_table_insert(params, g_uri_unescape_string(key, ""),
+            g_hash_table_insert(params_table, g_uri_unescape_string(key, ""),
                     g_uri_unescape_string(value, ""));
         }
-        free(param_str);
 
-        start_of_param = strtok_r(NULL, ";", &saveptr1);
+        g_strfreev(key_value);
     }
 
-    free(params_str);
+    g_strfreev(params);
 
-    return params;
+    return params_table;
 }
 
 static gboolean handle_message(PurpleAccount *acct, const char *jid,
@@ -139,18 +136,18 @@ typedef struct {
 
 static FocusContext *new_focus_context(PurpleAccount *acct, const char *jid,
         const char *body) {
-    FocusContext *context = malloc(sizeof(FocusContext));
+    FocusContext *context = g_new0(FocusContext, 1);
     context->acct = acct;
-    context->jid = strdup(jid);
-    if (body) context->body = strdup(body);
+    context->jid = g_strdup(jid);
+    context->body = g_strdup(body);
     context->tries = 0;
     return context;
 }
 
 static void free_focus_context(FocusContext *context) {
-    free(context->jid);
-    if (context->body) free(context->body);
-    free(context);
+    g_free(context->jid);
+    g_free(context->body);
+    g_free(context);
 }
 
 static gboolean focus_chat(gpointer data) {
@@ -232,7 +229,7 @@ static void log_action(PurpleAccount *acct, const char *jid,
     purple_debug_misc(PLUGIN_ID, "Action: %s\n", action);
     char *params_str = to_string(params);
     purple_debug_misc(PLUGIN_ID, "Parameters: %s\n", params_str);
-    free(params_str);
+    g_free(params_str);
 }
 
 static gboolean handle_action(PurpleAccount *acct, const char *jid,
@@ -271,27 +268,40 @@ static gboolean handle_uri(GtkIMHtml *imhtml, GtkIMHtmlLink *link) {
     }
 
     const char *start_of_jid = url + strlen("xmpp:");
-    char *jid = strndup(start_of_jid, query - start_of_jid);
+    char *jid = g_strndup(start_of_jid, query - start_of_jid);
 
     const char *end_of_action = strchr(query, ';');
     if (!end_of_action) end_of_action = strchr(query, '\0');
-    char *action = strndup(query, end_of_action - query);
+    char *action = g_strndup(query, end_of_action - query);
 
     GHashTable *params = find_params(query);
 
     gboolean r = handle_action(acct, jid, action, params);
 
-    free(jid);
-    free(action);
+    g_free(jid);
+    g_free(action);
     g_hash_table_destroy(params);
     return r;
 }
 
 static gboolean plugin_load(PurplePlugin *plugin) {
-    gtk_imhtml_class_register_protocol("xmpp:", handle_uri, NULL);
+    // XXX: The windows installer inadvertently takes over internal xmpp links if
+    // the xmpp registry handler is added. I'm pretty sure this is
+    // unintentional, as the registry handler is meant for external links only
+    // (e.g. click on xmpp in a browser window will cause pidgin to handle it).
+    // So to prevent an issue we clear any existing callback so this plugin
+    // can handle it.
+    gtk_imhtml_class_register_protocol("xmpp:", NULL, NULL);
 
-    purple_debug_info(PLUGIN_ID, "Loaded\n");
-    return TRUE;
+    gboolean r = gtk_imhtml_class_register_protocol("xmpp:", handle_uri, NULL);
+
+    if (r) {
+        purple_debug_info(PLUGIN_ID, "Loaded\n");
+    } else {
+        purple_debug_error(PLUGIN_ID, "bug: unable to register xmpp protocol\n");
+    }
+
+    return r;
 }
 
 static gboolean plugin_unload(PurplePlugin *plugin) {
