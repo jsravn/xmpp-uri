@@ -288,14 +288,14 @@ static gboolean handle_uri(GtkIMHtml *imhtml, GtkIMHtmlLink *link) {
 }
 
 static gboolean plugin_load(PurplePlugin *plugin) {
-	gtk_imhtml_class_register_protocol("xmpp:", handle_uri, NULL);
+    gtk_imhtml_class_register_protocol("xmpp:", handle_uri, NULL);
 
     purple_debug_info(PLUGIN_ID, "Loaded\n");
     return TRUE;
 }
 
 static gboolean plugin_unload(PurplePlugin *plugin) {
-	gtk_imhtml_class_register_protocol("xmpp:", NULL, NULL);
+    gtk_imhtml_class_register_protocol("xmpp:", NULL, NULL);
 
     purple_debug_info(PLUGIN_ID, "Unloaded\n");
     return TRUE;
