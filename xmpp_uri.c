@@ -336,8 +336,7 @@ static PurplePluginInfo info = {
     NULL
 };
 
-static void
-init_plugin(PurplePlugin *plugin)
+static void init_plugin(PurplePlugin *plugin)
 {
     plugin_instance = plugin;
 }
