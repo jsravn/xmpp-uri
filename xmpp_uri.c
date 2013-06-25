@@ -35,7 +35,7 @@
 #define PLUGIN_ID           "gtk-jravn-xmppuri"
 #define PLUGIN_NAME         "XMPP URI Handler"
 #define PLUGIN_STATIC_NAME  "xmpp_uri"
-#define PLUGIN_VERSION      "0.2-dev"
+#define PLUGIN_VERSION      "0.2"
 #define PLUGIN_SUMMARY      "Handler for inline XMPP URI links (XEP-0147)."
 #define PLUGIN_DESCRIPTION  "This plugin supports clicking of XMPP URI links. "\
                             "The URI scheme is defined by XEP-0147. "\
